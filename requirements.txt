@@ -1,0 +1,8 @@
+streamlit==1.63.0
+pymupdf==1.28.2
+sentence-transformers==6.0.1
+google-genai==2.22.0
+python-dotenv>=1.0,<2.0
+numpy>=2.0,<3.0
+torch==2.14.0
+torchvision==0.29.0

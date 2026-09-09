@@ -1,0 +1,78 @@
+# -----------------------------
+
+# Environment variables / secrets
+
+# -----------------------------
+
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# -----------------------------
+
+# Python virtual environments
+
+# -----------------------------
+
+.venv/
+venv/
+env/
+
+# -----------------------------
+
+# Python cache files
+
+# -----------------------------
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# -----------------------------
+
+# Testing / tooling caches
+
+# -----------------------------
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# -----------------------------
+
+# Build artifacts
+
+# -----------------------------
+
+build/
+dist/
+*.egg-info/
+
+# -----------------------------
+
+# IDE / editor files
+
+# -----------------------------
+
+.vscode/
+.idea/
+
+# -----------------------------
+
+# Operating system files
+
+# -----------------------------
+
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+
+# Logs
+
+# -----------------------------
+
+*.log
