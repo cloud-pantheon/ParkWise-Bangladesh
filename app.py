@@ -7,19 +7,19 @@ from google import genai
 from sentence_transformers import SentenceTransformer
 
 
-# ---------------------------------------------------------
-# IMPORT FILES FROM SRC
-# ---------------------------------------------------------
+# =========================================================
+# IMPORT SRC MODULES
+# =========================================================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 sys.path.append(
-    os.path.join(
-        os.path.dirname(__file__),
-        "src"
-    )
+    os.path.join(BASE_DIR, "src")
 )
 
 from retriever import (
-    load_all_chunks,
+    MODEL_NAME,
+    load_all_records,
     build_embeddings,
     search
 )
@@ -27,56 +27,81 @@ from retriever import (
 from rag import generate_answer
 
 
-MODEL_NAME = "all-MiniLM-L6-v2"
-
-
-# ---------------------------------------------------------
-# PAGE CONFIG
-# ---------------------------------------------------------
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
 
 st.set_page_config(
-    page_title="ParkWise AI",
-    page_icon="🏞️",
+    page_title="ParkWise Bangladesh",
+    page_icon="🇧🇩",
     layout="centered"
 )
 
 
-# ---------------------------------------------------------
-# SOURCE DISPLAY NAMES
-# ---------------------------------------------------------
+# =========================================================
+# CUSTOM CSS
+# =========================================================
 
-SOURCE_NAMES = {
-    "redwood.pdf":
-        "Redwood National & State Parks",
+st.markdown(
+    """
+    <style>
 
-    "mount_rainier.pdf":
-        "Mount Rainier National Park",
+    .main-title {
+        font-size: 42px;
+        font-weight: 700;
+        margin-bottom: 0px;
+    }
 
-    "rocky_mountain.pdf":
-        "Rocky Mountain National Park"
-}
+    .subtitle {
+        font-size: 17px;
+        color: #777;
+        margin-bottom: 25px;
+    }
+
+    .source-card {
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(128,128,128,0.25);
+        margin-bottom: 10px;
+    }
+
+    .metric-label {
+        font-size: 13px;
+        color: #777;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
-def pretty_source(filename):
-    return SOURCE_NAMES.get(
-        filename,
-        filename
-    )
-
-
-# ---------------------------------------------------------
-# LOAD ENVIRONMENT VARIABLES
-# ---------------------------------------------------------
+# =========================================================
+# API KEY
+# =========================================================
 
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 
+
+# Streamlit Cloud support
+try:
+    if not api_key and "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+
+except Exception:
+    pass
+
+
 if not api_key:
+
     st.error(
         "Gemini API key was not found. "
-        "Check your .env file."
+        "Add GEMINI_API_KEY to your .env file "
+        "or Streamlit deployment secrets."
     )
+
     st.stop()
 
 
@@ -85,106 +110,160 @@ client = genai.Client(
 )
 
 
-# ---------------------------------------------------------
-# LOAD RAG SYSTEM
-# ---------------------------------------------------------
+# =========================================================
+# INITIALIZE RAG
+# =========================================================
 
 @st.cache_resource
 def initialize_rag():
 
-    chunks = load_all_chunks()
+    records = load_all_records()
 
     embedding_model = SentenceTransformer(
         MODEL_NAME
     )
 
     embeddings = build_embeddings(
-        chunks,
+        records,
         embedding_model
     )
 
     return (
-        chunks,
+        records,
         embedding_model,
         embeddings
     )
 
 
 with st.spinner(
-    "Loading ParkWise knowledge base..."
+    "Loading Bangladesh Parks knowledge base..."
 ):
 
     (
-        chunks,
+        records,
         embedding_model,
         embeddings
     ) = initialize_rag()
 
 
-# ---------------------------------------------------------
-# HEADER
-# ---------------------------------------------------------
+# =========================================================
+# CHAT SESSION
+# =========================================================
 
-st.title("🏞️ ParkWise AI")
+if "messages" not in st.session_state:
 
-st.markdown(
-    """
-    Ask questions about U.S. National Parks using
-    information retrieved from official National Park
-    Service documents.
-    """
-)
-
-st.info(
-    "ParkWise answers using its document knowledge base "
-    "instead of relying only on the language model."
-)
+    st.session_state.messages = []
 
 
-# ---------------------------------------------------------
+# =========================================================
 # SIDEBAR
-# ---------------------------------------------------------
+# =========================================================
 
 with st.sidebar:
 
-    st.header("🏞️ ParkWise")
+    st.title("🇧🇩 ParkWise")
 
-    st.write(
-        "A beginner-friendly Retrieval-Augmented "
-        "Generation project."
+    st.caption(
+        "Bangladesh National Parks RAG Assistant"
     )
 
     st.divider()
 
-    st.subheader("Available Parks")
 
-    st.write("🌲 Redwood National & State Parks")
-    st.write("🌋 Mount Rainier National Park")
-    st.write("🏔️ Rocky Mountain National Park")
+    # -----------------------------------------------------
+    # PARKS
+    # -----------------------------------------------------
+
+    st.subheader("🌿 Current Parks")
+
+    st.write(
+        "🌳 Lawachara National Park"
+    )
+
+    st.write(
+        "🌲 Satchari National Park"
+    )
+
+    st.write(
+        "🌴 Bhawal National Park"
+    )
+
 
     st.divider()
 
-    st.subheader("Knowledge Base")
+
+    # -----------------------------------------------------
+    # KNOWLEDGE BASE
+    # -----------------------------------------------------
+
+    st.subheader(
+        "📚 Knowledge Base"
+    )
 
     st.metric(
-        "Document chunks",
-        len(chunks)
+        "Knowledge Records",
+        len(records)
     )
 
     st.caption(
-        "Embedding model: all-MiniLM-L6-v2"
+        "Embedding model"
     )
+
+    st.code(
+        MODEL_NAME,
+        language=None
+    )
+
 
     st.divider()
 
-    # Developer debug switch
+
+    # -----------------------------------------------------
+    # RETRIEVAL EVALUATION
+    # -----------------------------------------------------
+
+    st.subheader(
+        "🧪 Retrieval Evaluation"
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.metric(
+            "Top-1",
+            "100%"
+        )
+
+    with col2:
+
+        st.metric(
+            "Top-3",
+            "100%"
+        )
+
+    st.caption(
+        "18-question curated benchmark"
+    )
+
+
+    st.divider()
+
+
+    # -----------------------------------------------------
+    # DEBUG
+    # -----------------------------------------------------
+
     debug_mode = st.toggle(
-        "🔧 Developer Debug Mode"
+        "🔧 Developer Debug Mode",
+        value=False
     )
 
-    st.divider()
 
-    # Clear Chat
+    # -----------------------------------------------------
+    # CLEAR CHAT
+    # -----------------------------------------------------
+
     if st.button(
         "🗑️ Clear Chat",
         use_container_width=True
@@ -195,18 +274,68 @@ with st.sidebar:
         st.rerun()
 
 
-# ---------------------------------------------------------
-# SESSION STATE
-# ---------------------------------------------------------
+    st.divider()
 
-if "messages" not in st.session_state:
+    st.caption(
+        "Educational project. "
+        "Not an official Bangladesh Forest "
+        "Department application."
+    )
 
-    st.session_state.messages = []
+
+# =========================================================
+# HEADER
+# =========================================================
+
+st.markdown(
+    """
+    <div class="main-title">
+        🇧🇩🌿 ParkWise Bangladesh
+    </div>
+
+    <div class="subtitle">
+        Explore Bangladesh's national parks through
+        a Retrieval-Augmented Generation system.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
-# ---------------------------------------------------------
+st.info(
+    "ParkWise searches a curated knowledge base derived "
+    "from Bangladesh Forest Department and BFIS materials "
+    "before generating its answer."
+)
+
+
+# =========================================================
+# EXAMPLE QUESTIONS
+# =========================================================
+
+if len(st.session_state.messages) == 0:
+
+    st.markdown(
+        "#### 💡 Try asking"
+    )
+
+    examples = [
+        "What animals live in Bhawal National Park?",
+        "Where is Lawachara National Park?",
+        "What visitor facilities are available at Satchari?",
+        "What type of forest is Bhawal National Park?"
+    ]
+
+    for example in examples:
+
+        st.markdown(
+            f"- {example}"
+        )
+
+
+# =========================================================
 # DISPLAY CHAT HISTORY
-# ---------------------------------------------------------
+# =========================================================
 
 for message in st.session_state.messages:
 
@@ -217,6 +346,11 @@ for message in st.session_state.messages:
         st.markdown(
             message["content"]
         )
+
+
+        # -------------------------------------------------
+        # DISPLAY STORED SOURCES
+        # -------------------------------------------------
 
         if (
             message["role"] == "assistant"
@@ -229,64 +363,91 @@ for message in st.session_state.messages:
 
                 for source in message["sources"]:
 
-                    park_name = pretty_source(
-                        source["source"]
-                    )
-
                     st.markdown(
                         f"""
-**🌿 {park_name}**
+### 🌿 {source["park"]}
 
-Page **{source['page']}**
+**Topic:** `{source["topic"]}`
 
-Relevance: **{source['score']:.2f}**
+**Source:** {source["source_title"]}
+
+**Year:** {
+    source["source_year"]
+    if source["source_year"]
+    else "Not specified"
+}
+
+**Relevance:** {source["score"]:.2f}
 """
                     )
+
+                    if source.get(
+                        "freshness_note"
+                    ):
+
+                        st.caption(
+                            source["freshness_note"]
+                        )
+
+                    if source.get(
+                        "source_url"
+                    ):
+
+                        st.markdown(
+                            f"[🔗 Open original source]"
+                            f"({source['source_url']})"
+                        )
 
                     st.divider()
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CHAT INPUT
-# ---------------------------------------------------------
+# =========================================================
 
 question = st.chat_input(
-    "Ask about pets, hiking, wildlife, camping, safety..."
+    "Ask about wildlife, forests, locations, facilities..."
 )
 
 
 if question:
 
-    # ---------------------------------------------
-    # USER MESSAGE
-    # ---------------------------------------------
+
+    # =====================================================
+    # DISPLAY USER MESSAGE
+    # =====================================================
 
     st.session_state.messages.append({
         "role": "user",
         "content": question
     })
 
-    with st.chat_message("user"):
 
-        st.markdown(question)
+    with st.chat_message(
+        "user"
+    ):
+
+        st.markdown(
+            question
+        )
 
 
-    # ---------------------------------------------
+    # =====================================================
     # RETRIEVAL
-    # ---------------------------------------------
+    # =====================================================
 
     results = search(
         question,
-        chunks,
+        records,
         embeddings,
         embedding_model,
         top_k=5
     )
 
 
-    # ---------------------------------------------
-    # DEBUG PANEL
-    # ---------------------------------------------
+    # =====================================================
+    # DEBUG MODE
+    # =====================================================
 
     if debug_mode:
 
@@ -295,17 +456,22 @@ if question:
             expanded=False
         ):
 
-            for result in results:
+            for rank, result in enumerate(
+                results,
+                start=1
+            ):
 
                 st.markdown(
                     f"""
-**{pretty_source(result['source'])}**
+### Result {rank}
 
-Page: `{result['page']}`
+**Park:** {result["park"]}
 
-Chunk: `{result['chunk_id']}`
+**Topic:** `{result["topic"]}`
 
-Score: `{result['score']:.3f}`
+**Score:** `{result["score"]:.3f}`
+
+**Record ID:** `{result["id"]}`
 """
                 )
 
@@ -313,17 +479,24 @@ Score: `{result['score']:.3f}`
                     result["text"]
                 )
 
+                st.caption(
+                    f"Source: "
+                    f"{result['source_title']}"
+                )
+
                 st.divider()
 
 
-    # ---------------------------------------------
-    # GENERATE ANSWER
-    # ---------------------------------------------
+    # =====================================================
+    # GENERATION
+    # =====================================================
 
-    with st.chat_message("assistant"):
+    with st.chat_message(
+        "assistant"
+    ):
 
         with st.spinner(
-            "Searching park documents..."
+            "Searching Bangladesh park information..."
         ):
 
             answer = generate_answer(
@@ -332,102 +505,151 @@ Score: `{result['score']:.3f}`
                 client
             )
 
-        st.markdown(answer)
+
+        st.markdown(
+            answer
+        )
 
 
-        # -----------------------------------------
-        # FILTER SOURCES
-        # -----------------------------------------
+        # =================================================
+        # SOURCE FILTERING
+        # =================================================
 
-        source_results = []
+        selected_sources = []
 
         if results:
 
             best_score = results[0]["score"]
 
-            # Only display sources reasonably close
-            # to the strongest retrieved result.
-            for result in results:
 
-                if (
-                    result["score"]
-                    >= best_score - 0.18
-                ):
+            # Keep sources reasonably close
+            # to strongest retrieval.
+            relevant_results = [
 
-                    source_results.append(
-                        result
-                    )
+                result
+
+                for result in results
+
+                if result["score"]
+                >= best_score - 0.20
+            ]
 
 
-        # -----------------------------------------
-        # REMOVE DUPLICATE PAGE SOURCES
-        # -----------------------------------------
-
-        unique_sources = []
-
-        seen = set()
-
-        for result in source_results:
-
-            key = (
-                result["source"],
-                result["page"]
+            # Maximum 3 source cards
+            relevant_results = (
+                relevant_results[:3]
             )
 
-            if key not in seen:
 
-                unique_sources.append({
-                    "source":
-                        result["source"],
+            # Remove duplicate records
+            seen = set()
 
-                    "page":
-                        result["page"],
 
-                    "score":
-                        result["score"]
-                })
+            for result in relevant_results:
+
+                key = result["id"]
+
+                if key in seen:
+                    continue
 
                 seen.add(key)
 
 
-        # -----------------------------------------
-        # DISPLAY SOURCES
-        # -----------------------------------------
+                selected_sources.append({
 
-        if unique_sources:
+                    "id":
+                        result["id"],
+
+                    "park":
+                        result["park"],
+
+                    "topic":
+                        result["topic"],
+
+                    "score":
+                        result["score"],
+
+                    "source_title":
+                        result["source_title"],
+
+                    "source_url":
+                        result["source_url"],
+
+                    "source_year":
+                        result["source_year"],
+
+                    "freshness_note":
+                        result["freshness_note"]
+                })
+
+
+        # =================================================
+        # DISPLAY SOURCES
+        # =================================================
+
+        if selected_sources:
 
             with st.expander(
                 "📚 View Sources"
             ):
 
-                for source in unique_sources:
-
-                    park_name = pretty_source(
-                        source["source"]
-                    )
+                for source in selected_sources:
 
                     st.markdown(
                         f"""
-**🌿 {park_name}**
+### 🌿 {source["park"]}
 
-📄 Page **{source['page']}**
+**Topic:** `{source["topic"]}`
 
-🎯 Relevance **{source['score']:.2f}**
+**Source:** {source["source_title"]}
+
+**Year:** {
+    source["source_year"]
+    if source["source_year"]
+    else "Not specified"
+}
+
+**Relevance:** {source["score"]:.2f}
 """
                     )
+
+
+                    if source.get(
+                        "freshness_note"
+                    ):
+
+                        st.caption(
+                            source[
+                                "freshness_note"
+                            ]
+                        )
+
+
+                    if source.get(
+                        "source_url"
+                    ):
+
+                        st.markdown(
+                            f"[🔗 Open original source]"
+                            f"({source['source_url']})"
+                        )
+
 
                     st.divider()
 
 
-    # ---------------------------------------------
+    # =====================================================
     # SAVE ASSISTANT MESSAGE
-    # ---------------------------------------------
+    # =====================================================
 
     st.session_state.messages.append({
 
-        "role": "assistant",
+        "role":
+            "assistant",
 
-        "content": answer,
+        "content":
+            answer,
 
-        "sources": unique_sources
+        "sources":
+            selected_sources
     })

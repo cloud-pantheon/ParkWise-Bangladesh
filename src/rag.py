@@ -1,57 +1,127 @@
-import os
 import time
 import random
+
 from google.genai import errors
-from dotenv import load_dotenv
-from google import genai
-from sentence_transformers import SentenceTransformer
-
-from retriever import load_all_chunks, build_embeddings, search
 
 
-MODEL_NAME = "all-MiniLM-L6-v2"
-
+# =========================================================
+# BUILD CONTEXT
+# =========================================================
 
 def build_context(results):
+
     context_parts = []
 
-    for number, result in enumerate(results, start=1):
+
+    for number, result in enumerate(
+        results,
+        start=1
+    ):
+
         context = f"""
 SOURCE {number}
-Document: {result['source']}
-Page: {result['page']}
-Text:
+
+Park:
+{result['park']}
+
+Topic:
+{result['topic']}
+
+Information:
 {result['text']}
+
+Original Source:
+{result['source_title']}
+
+Source Year:
+{result['source_year']}
+
+Source Type:
+{result['source_type']}
+
+Freshness Information:
+{result['freshness_note']}
 """
-        context_parts.append(context)
 
-    return "\n".join(context_parts)
+        context_parts.append(
+            context
+        )
 
 
-def generate_answer(question, results, client):
-    context = build_context(results)
+    return "\n".join(
+        context_parts
+    )
+
+
+# =========================================================
+# GENERATE ANSWER
+# =========================================================
+
+def generate_answer(
+    question,
+    results,
+    client
+):
+
+    context = build_context(
+        results
+    )
+
 
     prompt = f"""
-You are ParkWise, a National Park information assistant.
+You are ParkWise Bangladesh.
 
-Answer the user's question using ONLY the provided document context.
+You are an AI assistant that answers questions about
+Bangladesh national parks using a curated knowledge base.
 
-Rules:
+You MUST answer using ONLY the information in the
+DOCUMENT CONTEXT below.
+
+RULES:
+
 1. Do not use outside knowledge.
-2. Do not invent information.
-3. If the documents do not contain enough information, say:
-   "I couldn't find enough information in the available park documents."
-4. Keep the answer clear and concise.
-5. Do not invent sources or page numbers.
+
+2. Never invent facts.
+
+3. If the context does not contain enough information,
+say exactly:
+
+"I couldn't find enough information in the available
+Bangladesh park dataset."
+
+4. If information comes from an older management plan
+or historical document, briefly mention that the
+information may not represent current visitor conditions.
+
+5. Do not invent opening hours, ticket prices,
+transport schedules, current closures, phone numbers,
+or current regulations.
+
+6. Keep answers clear and easy to understand.
+
+7. You may combine information from multiple retrieved
+records when they support the question.
+
+8. Do not claim that ParkWise is an official government
+service.
 
 USER QUESTION:
+
 {question}
 
+
 DOCUMENT CONTEXT:
+
 {context}
+
 
 ANSWER:
 """
+
+
+    # =====================================================
+    # GEMINI FALLBACK MODELS
+    # =====================================================
 
     models = [
         "gemini-3.8-flash",
@@ -60,132 +130,73 @@ ANSWER:
         "gemini-3.5-flash-lite"
     ]
 
+
     for model_name in models:
 
         try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt
+
+            response = (
+                client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
             )
+
 
             if response.text:
+
                 return response.text
 
-        except errors.ServerError as e:
+
+        except errors.ServerError as error:
 
             print(
-                f"{model_name} temporarily unavailable: {e}"
+                f"{model_name} unavailable:"
             )
 
-            # Small delay before switching models
+            print(
+                error
+            )
+
+
             time.sleep(
-                1 + random.uniform(0, 0.5)
+                1
+                + random.uniform(
+                    0,
+                    0.5
+                )
             )
 
-            continue
 
-        except errors.ClientError as e:
+        except errors.ClientError as error:
 
             print(
-                f"{model_name} client/quota error: {e}"
+                f"{model_name} client error:"
             )
-
-            continue
-
-        except Exception as e:
 
             print(
-                f"Unexpected error using {model_name}: {e}"
+                error
             )
 
-            continue
 
+        except Exception as error:
+
+            print(
+                f"Unexpected error "
+                f"with {model_name}:"
+            )
+
+            print(
+                error
+            )
+
+
+    # =====================================================
+    # FALLBACK MESSAGE
+    # =====================================================
 
     return (
-        "ParkWise successfully found relevant information "
-        "in the park documents, but the AI generation service "
-        "is currently unavailable."
+        "ParkWise successfully retrieved relevant "
+        "Bangladesh park information, but the AI "
+        "generation service is temporarily unavailable."
     )
-
-
-def print_sources(results):
-    print("\nSources:")
-
-    seen = set()
-
-    for result in results:
-        source_key = (
-            result["source"],
-            result["page"]
-        )
-
-        if source_key not in seen:
-            print(
-                f"- {result['source']} — Page {result['page']}"
-            )
-
-            seen.add(source_key)
-
-
-if __name__ == "__main__":
-
-    load_dotenv()
-
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    if not api_key:
-        print("ERROR: GEMINI_API_KEY was not found in .env")
-        exit()
-
-    print("Loading ParkWise...")
-
-    # Gemini client
-    client = genai.Client(api_key=api_key)
-
-    # Load our PDF chunks
-    chunks = load_all_chunks()
-
-    print(f"Loaded {len(chunks)} chunks.")
-
-    # Load embedding model
-    embedding_model = SentenceTransformer(MODEL_NAME)
-
-    # Generate embeddings for all chunks
-    embeddings = build_embeddings(
-        chunks,
-        embedding_model
-    )
-
-    print("\nParkWise RAG is ready!")
-    print("Type 'exit' to stop.\n")
-
-    while True:
-
-        question = input("You: ")
-
-        if question.lower() == "exit":
-            print("Goodbye!")
-            break
-
-        # RETRIEVAL
-        results = search(
-            question,
-            chunks,
-            embeddings,
-            embedding_model,
-            top_k=3
-        )
-
-        # GENERATION
-        answer = generate_answer(
-            question,
-            results,
-            client
-        )
-
-        print("\nParkWise:")
-        print(answer)
-
-        print_sources(results)
-
-        print("\n" + "=" * 70 + "\n")

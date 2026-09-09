@@ -1,50 +1,97 @@
-# 🏞️ ParkWise AI
+# 🇧🇩🌿 ParkWise Bangladesh
 
-**ParkWise AI** is a beginner-friendly Retrieval-Augmented Generation (RAG) application that answers questions about U.S. National Parks using information retrieved from official park documents.
+**ParkWise Bangladesh** is a Retrieval-Augmented Generation (RAG) application for exploring information about Bangladesh national parks.
 
-Instead of asking a language model to answer from general knowledge, ParkWise first searches its local document collection, retrieves the most relevant passages, and provides those passages to Gemini as context for a grounded response.
+The system searches a custom-curated knowledge base derived from Bangladesh Forest Department and Bangladesh Forest Information System (BFIS) materials before generating an answer with Gemini.
 
-The project was built from scratch to demonstrate the core stages of a RAG pipeline without hiding the retrieval process behind a large RAG framework.
+The project was built from scratch as a learning-focused RAG implementation, with explicit document retrieval, metadata filtering, query expansion, topic-aware ranking, evaluation, grounded generation, and source transparency.
+
+---
+
+## 🚀 Live Demo
+
+> Add the Streamlit deployment URL here after deployment.
 
 ---
 
 ## ✨ Features
 
-* 📄 Extracts text from official park PDF documents
-* ✂️ Splits documents into overlapping text chunks
-* 🧠 Generates semantic embeddings with Sentence Transformers
-* 🔎 Performs semantic similarity search
-* 🏞️ Filters retrieval by detected national park
-* 🔤 Uses query expansion and keyword boosting
-* 🤖 Generates grounded responses with Gemini
-* 📚 Displays document and page sources
-* 🎯 Shows retrieval relevance scores
-* 💬 Provides a Streamlit chat interface
-* 🧪 Includes an optional retrieval debug mode
-* 🗑️ Supports clearing conversation history
-* 🛡️ Handles temporary AI API failures gracefully
+* 🇧🇩 Bangladesh-focused national park knowledge base
+* 🔎 Semantic retrieval using Sentence Transformers
+* 🧠 `all-MiniLM-L6-v2` embeddings
+* 📐 384-dimensional text embeddings
+* 🏞️ Automatic park detection
+* 🧩 Metadata filtering
+* 🔤 Query expansion
+* 🎯 Topic-aware score boosting
+* 🤖 Gemini-powered grounded answer generation
+* 📚 Original source information
+* 🔗 Links to Forest Department/BFIS sources
+* 🕒 Freshness warnings for historical management sources
+* 💬 Streamlit chat interface
+* 🔧 Developer retrieval-debug mode
+* 🗑️ Clear-chat functionality
+* 🧪 Automated retrieval evaluation
+
+---
+
+# 🌳 Supported Parks
+
+The current version includes information for:
+
+* **Lawachara National Park**
+* **Satchari National Park**
+* **Bhawal National Park**
+
+The knowledge base contains curated records covering subjects such as:
+
+* wildlife
+* birds
+* biodiversity
+* forest type
+* location
+* access
+* visitor facilities
+* communities
+* conservation
+* ecotourism
+* management
+* threats
+* biodiversity monitoring
 
 ---
 
 # 🧠 What is RAG?
 
-Retrieval-Augmented Generation combines information retrieval with a Large Language Model.
+Retrieval-Augmented Generation improves an LLM response by first retrieving relevant information from a trusted knowledge base.
 
-Instead of sending only a user's question to the LLM, ParkWise first searches trusted documents for relevant information.
-
-The retrieved text becomes additional context for the model.
+Instead of sending only this:
 
 ```text
 User Question
       ↓
-Retrieve Relevant Information
+     LLM
       ↓
-Provide Question + Context to LLM
-      ↓
-Generate Grounded Answer
+   Answer
 ```
 
-This reduces the need for the model to rely entirely on its general training knowledge.
+ParkWise uses:
+
+```text
+User Question
+      ↓
+Search Knowledge Base
+      ↓
+Retrieve Relevant Records
+      ↓
+Question + Retrieved Evidence
+      ↓
+Gemini
+      ↓
+Grounded Answer + Sources
+```
+
+This makes the model less dependent on general training knowledge and allows ParkWise to show where its information came from.
 
 ---
 
@@ -53,315 +100,348 @@ This reduces the need for the model to rely entirely on its general training kno
 ```mermaid
 flowchart TD
 
-    subgraph INGESTION["Document Ingestion Pipeline"]
-        A["Official National Park PDFs"]
-        B["PyMuPDF Text Extraction"]
-        C["Page Text + Metadata"]
-        D["250-word Chunks<br/>50-word Overlap"]
-        E["Sentence Transformer<br/>all-MiniLM-L6-v2"]
-        F["384-Dimensional<br/>Chunk Embeddings"]
+    A["Curated Bangladesh Parks Dataset<br/>JSONL"]
 
-        A --> B
-        B --> C
-        C --> D
-        D --> E
-        E --> F
-    end
+    B["Dataset Loader"]
 
-    subgraph RETRIEVAL["Retrieval Pipeline"]
-        U["User Question"]
-        P["Park Detection"]
-        Q["Query Expansion"]
-        QE["Question Embedding"]
-        S["Cosine Similarity<br/>NumPy"]
-        MF["Park Metadata Filter"]
-        KB["Keyword Boosting"]
-        T["Top 5 Relevant Chunks"]
+    C["Knowledge Records<br/>Text + Park + Topic + Source Metadata"]
 
-        U --> P
-        P --> Q
-        Q --> QE
-        QE --> S
-        F --> S
-        S --> MF
-        MF --> KB
-        KB --> T
-    end
+    D["Sentence Transformer<br/>all-MiniLM-L6-v2"]
 
-    subgraph GENERATION["Generation Pipeline"]
-        CB["Build Grounded Context"]
-        G["Gemini"]
-        AN["Grounded Answer"]
-        SR["Sources + Pages + Relevance"]
+    E["384-Dimensional Record Embeddings"]
 
-        T --> CB
-        CB --> G
-        G --> AN
-        T --> SR
-    end
+    U["User Question"]
 
-    UI["Streamlit Web Interface"]
+    P["Park Detection"]
+
+    Q["Query Expansion"]
+
+    QE["Query Embedding"]
+
+    S["Semantic Similarity<br/>NumPy"]
+
+    M["Park Metadata Filtering"]
+
+    T["Topic-Aware Score Boosting"]
+
+    K["Top-K Relevant Records"]
+
+    CXT["Grounded Context Builder"]
+
+    G["Gemini"]
+
+    ANS["Grounded Answer"]
+
+    SRC["Source Metadata<br/>Source Link + Freshness Information"]
+
+    UI["Streamlit Interface"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
 
     UI --> U
-    AN --> UI
-    SR --> UI
+    U --> P
+    P --> Q
+    Q --> QE
+
+    QE --> S
+    E --> S
+
+    S --> M
+    M --> T
+    T --> K
+
+    K --> CXT
+    CXT --> G
+    G --> ANS
+
+    K --> SRC
+
+    ANS --> UI
+    SRC --> UI
 ```
 
 ---
 
-# 🔄 End-to-End RAG Pipeline
+# 🔄 RAG Pipeline
 
-ParkWise follows these stages:
+## 1. Custom Knowledge Dataset
 
-### 1. Document Loading
+ParkWise uses a custom JSONL dataset rather than sending entire PDFs directly to the LLM.
 
-Official park PDF files are loaded using **PyMuPDF**.
+Each record contains structured metadata similar to:
 
-Each extracted page keeps metadata such as:
-
-```python
+```json
 {
-    "source": "redwood.pdf",
-    "page": 2,
-    "text": "..."
+  "id": "bhawal_04",
+  "park": "Bhawal National Park",
+  "country": "Bangladesh",
+  "topic": "wildlife",
+  "text": "Forest Department information reports...",
+  "source_title": "Bhawal National Park — Bangladesh Forest Department",
+  "source_url": "...",
+  "source_year": null,
+  "source_type": "official_webpage",
+  "freshness_note": "Official source..."
 }
 ```
 
-Keeping metadata allows ParkWise to show the user where retrieved information came from.
+This provides the retriever with both semantic text and structured metadata.
 
 ---
 
-### 2. Chunking
+## 2. Embedding Generation
 
-Large PDF pages are divided into smaller pieces.
-
-Current configuration:
-
-```text
-Chunk size: 250 words
-Overlap: 50 words
-```
-
-Overlap helps prevent information from being lost when an important sentence appears near the boundary between two chunks.
-
----
-
-### 3. Embeddings
-
-Each chunk is converted into a numerical vector using:
+ParkWise uses:
 
 ```text
 all-MiniLM-L6-v2
 ```
 
-Each embedding contains:
+to convert each knowledge record into a:
 
 ```text
-384 dimensions
+384-dimensional vector
 ```
 
-Semantically similar pieces of text should have similar vector representations.
+Semantically related questions and records should have similar vector representations.
 
 ---
 
-### 4. Query Processing
+## 3. Park Detection
 
-When a user asks a question, ParkWise performs several preprocessing steps.
+When a query explicitly names a park, ParkWise identifies it.
+
+Example:
+
+```text
+Where is Lawachara National Park?
+
+             ↓
+
+Detected park:
+Lawachara National Park
+```
+
+This enables metadata filtering.
+
+---
+
+## 4. Query Expansion
+
+ParkWise expands certain query types with related terms.
 
 For example:
 
 ```text
-Can I bring my pets to Redwood Park?
+What animals live in Bhawal?
 ```
 
-ParkWise can detect:
+can be expanded with concepts such as:
 
 ```text
-Target park → Redwood
-Topic → pets
+wildlife
+animals
+mammals
+birds
+reptiles
+amphibians
+biodiversity
 ```
 
-The query can also be expanded with related terms such as:
-
-```text
-pets
-dogs
-allowed
-prohibited
-leash
-restrained
-trails
-```
-
-This improves retrieval when the user's wording differs from the wording in the source document.
+This helps when user wording differs from the dataset wording.
 
 ---
 
-### 5. Semantic Retrieval
+## 5. Semantic Retrieval
 
-The user's question is converted into the same 384-dimensional embedding representation.
+The expanded query is converted into an embedding.
 
-ParkWise compares the query vector against document vectors using normalized vector similarity.
-
-The implementation currently uses **NumPy** for the similarity calculation.
+The query vector is compared with record embeddings using normalized vector similarity with NumPy.
 
 ---
 
-### 6. Metadata Filtering
+## 6. Metadata Filtering
 
-If the question clearly identifies a park, ParkWise filters unrelated park documents.
-
-For example:
+If a park is detected, unrelated parks can be removed from the candidate set.
 
 ```text
-Question:
-Can I bring pets to Redwood Park?
+Question mentions Bhawal
 
-                ↓
+          ↓
 
-Search:
-redwood.pdf
+Search Bhawal records
 
-Not:
-mount_rainier.pdf
-rocky_mountain.pdf
+          ↓
+
+Exclude Lawachara
+Exclude Satchari
 ```
-
-This improves retrieval precision.
 
 ---
 
-### 7. Keyword Boosting
+## 7. Topic-Aware Ranking
 
-Semantic similarity is combined with lightweight keyword matching.
+ParkWise applies lightweight topic boosts.
 
-This creates a simple hybrid retrieval strategy:
+For example, a question containing:
+
+```text
+visitor facilities
+```
+
+gives additional ranking weight to records tagged:
+
+```text
+facilities
+```
+
+Likewise, wildlife, forest type, access, location, conservation, management, communities, threats, ecotourism, and monitoring have topic-aware ranking rules.
+
+The final retrieval score therefore combines:
 
 ```text
 Semantic Similarity
         +
-Keyword Matching
+Metadata Filtering
         +
-Park Metadata Filtering
-        ↓
-Ranked Results
+Topic-Aware Boosting
 ```
 
 ---
 
-### 8. Top-K Retrieval
+## 8. Top-K Retrieval
 
-ParkWise currently selects the top:
+The highest-scoring records are selected and passed to the generation stage.
+
+ParkWise currently retrieves up to:
 
 ```text
-5 chunks
+Top 5 records
 ```
-
-These chunks become the evidence supplied to the language model.
 
 ---
 
-### 9. Grounded Generation
+## 9. Grounded Gemini Generation
 
-The retrieved chunks and user question are sent to Gemini.
+The retrieved evidence is transformed into a context prompt for Gemini.
 
-The prompt instructs the model to:
+The model is instructed to:
 
-* answer only from the supplied document context
+* answer only from supplied context
 * avoid inventing information
-* state when the documents do not contain enough information
-* avoid fabricating sources or page numbers
+* state when the dataset is insufficient
+* distinguish historical management material from live visitor information
+* avoid inventing current prices, closures, schedules, or regulations
 
 ---
 
-### 10. Source Display
+## 10. Source Transparency
 
-ParkWise displays source information alongside answers, including:
+ParkWise displays:
 
-```text
-🌿 Redwood National & State Parks
-📄 Page 2
-🎯 Retrieval relevance score
-```
+* park
+* topic
+* source title
+* source year
+* retrieval relevance
+* freshness warning
+* original source link
 
-A developer debug mode can also display the complete retrieved chunks.
+Developer Debug Mode additionally shows:
 
----
-
-# 📚 Current Knowledge Base
-
-ParkWise Version 1 currently uses documents for:
-
-* 🌲 Redwood National & State Parks
-* 🌋 Mount Rainier National Park
-* 🏔️ Rocky Mountain National Park
-
-The documents were collected from official National Park Service sources.
+* record ID
+* retrieved text
+* exact retrieval score
+* retrieval ranking
 
 ---
 
-# 🛠️ Technology Stack
+# 🧪 Retrieval Evaluation
 
-| Area                  | Technology                |
-| --------------------- | ------------------------- |
-| Language              | Python                    |
-| Frontend              | Streamlit                 |
-| PDF Processing        | PyMuPDF                   |
-| Embeddings            | Sentence Transformers     |
-| Embedding Model       | all-MiniLM-L6-v2          |
-| Similarity Search     | NumPy                     |
-| Generation            | Gemini                    |
-| Gemini SDK            | Google GenAI              |
-| Environment Variables | python-dotenv             |
-| Deployment            | Streamlit Community Cloud |
-| Version Control       | Git / GitHub              |
+ParkWise includes an automated evaluation script using a custom benchmark of **18 questions**.
+
+Current controlled benchmark results:
+
+| Metric                   |           Result |
+| ------------------------ | ---------------: |
+| Top-1 Retrieval Accuracy | **18/18 — 100%** |
+| Top-3 Retrieval Accuracy | **18/18 — 100%** |
+
+Top-1 accuracy checks whether the expected park/topic is the first retrieved result.
+
+Top-3 accuracy checks whether the expected park/topic appears anywhere in the first three retrieved results.
+
+### Important
+
+This is a small, curated benchmark created for this project's knowledge base. The 100% result should not be interpreted as 100% accuracy for arbitrary unseen questions.
+
+A future version should include a larger hold-out evaluation set with independently written queries.
 
 ---
 
 # 📁 Project Structure
 
 ```text
-parkwise-rag/
+ParkWise-AI/
 │
 ├── app.py
-│
 ├── README.md
-│
 ├── requirements.txt
-│
 ├── .gitignore
 │
-├── .env                 # local only — never commit
-│
 ├── data/
-│   ├── mount_rainier.pdf
-│   ├── redwood.pdf
-│   └── rocky_mountain.pdf
+│   ├── bd_parks_rag_corpus.jsonl
+│   └── bd_parks_eval_questions.jsonl
 │
-└── src/
+├── src/
+│   ├── dataset_loader.py
+│   ├── retriever.py
+│   ├── evaluate_retrieval.py
+│   └── rag.py
+│
+└── legacy_pdf_pipeline/
     ├── pdf_loader.py
     ├── chunker.py
-    ├── embeddings.py
-    ├── retriever.py
-    └── rag.py
+    └── embeddings.py
 ```
 
 ---
 
-# ⚙️ Local Installation
+# 🛠️ Technology Stack
 
-## 1. Clone the Repository
+| Component              | Technology                |
+| ---------------------- | ------------------------- |
+| Programming language   | Python                    |
+| UI                     | Streamlit                 |
+| Embeddings             | Sentence Transformers     |
+| Embedding model        | all-MiniLM-L6-v2          |
+| Similarity calculation | NumPy                     |
+| LLM                    | Gemini                    |
+| API SDK                | Google GenAI              |
+| Local secrets          | python-dotenv             |
+| Data format            | JSONL                     |
+| Deployment             | Streamlit Community Cloud |
+| Version control        | Git + GitHub              |
+
+---
+
+# ⚙️ Local Setup
+
+## Clone
 
 ```bash
-git clone <your-repository>
-cd parkwise-rag
+git clone https://github.com/cloud-pantheon/ParkWise-AI.git
+cd ParkWise-AI
 ```
 
-## 2. Create a Virtual Environment
+## Create virtual environment
 
 Windows:
 
-```bash
+```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
@@ -373,13 +453,13 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-## 3. Install Dependencies
+## Install dependencies
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-## 4. Configure the Gemini API Key
+## Add Gemini API key
 
 Create:
 
@@ -393,181 +473,169 @@ Add:
 GEMINI_API_KEY=your_api_key_here
 ```
 
-Never commit this file to GitHub.
+Never commit this file.
 
-## 5. Start ParkWise
+## Start the application
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Then open the local Streamlit address shown in the terminal.
+---
+
+# 🧪 Run Retrieval Evaluation
+
+```bash
+python src/evaluate_retrieval.py
+```
+
+Example result:
+
+```text
+Total Questions: 18
+
+Top-1 Accuracy: 18/18 (100.0%)
+Top-3 Accuracy: 18/18 (100.0%)
+```
+
+---
+
+# 💬 Example Questions
+
+```text
+What animals live in Bhawal National Park?
+```
+
+```text
+Where is Lawachara National Park?
+```
+
+```text
+What visitor facilities are available at Satchari?
+```
+
+```text
+What type of forest is Bhawal National Park?
+```
+
+```text
+How is biodiversity monitored in Satchari?
+```
+
+```text
+What conservation problems affect Bhawal?
+```
 
 ---
 
 # 🔐 Security
 
-ParkWise keeps the Gemini API key outside the source code.
+The Gemini API key is never stored directly in application source code.
 
-Local development uses:
+For local development:
 
 ```text
 .env
 ```
 
-The `.env` file is excluded through `.gitignore`.
+is excluded through `.gitignore`.
 
-Production deployments should use the hosting platform's secret-management system rather than storing API keys in the repository.
+For Streamlit Community Cloud, the key should be entered through Streamlit's Secrets configuration.
 
-If an API key is ever accidentally committed to a public repository, the key should be revoked or rotated immediately.
+If an API key is accidentally committed to GitHub, it should be revoked and replaced immediately.
 
 ---
 
 # ☁️ Deployment
 
-The application is designed for Streamlit Community Cloud.
+ParkWise Bangladesh is designed for Streamlit Community Cloud.
 
-Deployment requires:
+Deployment configuration:
 
 ```text
+Repository:
+cloud-pantheon/ParkWise-AI
+
+Branch:
+main
+
+Entrypoint:
 app.py
-requirements.txt
-data/
-src/
 ```
 
-The Gemini API key must be added through Streamlit's deployment secrets rather than committed to GitHub.
-
-Example secret:
+Add this secret in Streamlit Community Cloud:
 
 ```toml
-GEMINI_API_KEY = "your_api_key_here"
+GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
 ```
 
-The app accesses the value through:
-
-```python
-os.getenv("GEMINI_API_KEY")
-```
+Do not upload `.env` to GitHub.
 
 ---
 
-# 🧪 Example Questions
-
-Try asking:
-
-```text
-Can I bring my pets to Redwood Park?
-```
-
-```text
-What wildlife can I see in Redwood?
-```
-
-```text
-What should I know about hiking safety in Rocky Mountain National Park?
-```
-
-```text
-Where can I camp in Mount Rainier National Park?
-```
-
----
-
-# 🔍 Retrieval Debugging
-
-ParkWise includes an optional developer mode.
-
-When enabled, it displays:
-
-* retrieved document
-* page number
-* chunk ID
-* relevance score
-* full retrieved text
-
-This makes it possible to determine whether an incorrect answer was caused by:
-
-```text
-Poor Retrieval
-      ↓
-Retriever problem
-```
-
-or:
-
-```text
-Correct Retrieval
-      +
-Poor Generated Answer
-      ↓
-Generation/prompt problem
-```
-
----
-
-# ⚠️ Current Limitations
-
-ParkWise Version 1 intentionally remains small and understandable.
+# ⚠️ Limitations
 
 Current limitations include:
 
-* only three parks
-* small document collection
-* embeddings are recreated when the application initializes
+* only three Bangladesh national parks
+* a relatively small curated dataset
+* embeddings are generated when the application initializes
 * no persistent vector database
-* lightweight keyword boosting rather than a full search engine
-* no reranking model
-* no automated RAG evaluation suite
-* responses depend on external Gemini API availability
+* no neural reranker
+* no BM25 search engine
+* benchmark is small and curated
+* historical management documents may not represent current visitor conditions
+* live information such as weather, ticket prices, closures, opening hours, and transportation is not currently retrieved
+* Gemini availability can affect answer generation
 
 ---
 
 # 🚀 Future Improvements
 
-Possible Version 2 improvements include:
+Potential Version 2 features:
 
-* FAISS or Qdrant vector storage
-* persistent precomputed embeddings
-* additional National Park documents
-* document upload support
-* advanced metadata filtering
-* automatic park/entity detection
-* BM25 + semantic hybrid search
-* reranking
-* retrieval evaluation
-* citation-level evidence highlighting
+* additional Bangladesh national parks
+* persistent FAISS or Qdrant vector index
+* BM25 + vector hybrid search
+* reranking model
+* larger unseen evaluation set
+* automated RAG evaluation metrics
+* live weather integration
+* map integration
+* current park-status retrieval
+* multilingual Bangla/English queries
+* Bangla answer generation
 * conversational query rewriting
-* automated tests
-* RAG quality metrics
-* agentic retrieval tools
+* user document upload
+* citation-level evidence highlighting
+* agentic RAG with live information tools
 
 ---
 
-# 🎯 Learning Goals
+# 🎯 Learning Outcomes
 
-This project demonstrates understanding of:
+This project demonstrates experience with:
 
 * Retrieval-Augmented Generation
-* PDF text extraction
-* document chunking
+* custom dataset creation
 * embeddings
-* cosine similarity
 * semantic search
+* cosine similarity
 * metadata filtering
 * query expansion
-* hybrid retrieval
-* prompt grounding
+* ranking heuristics
+* retrieval evaluation
+* grounded prompting
 * API integration
-* Streamlit application development
 * secret management
-* deployment
-* Git version control
+* Streamlit application development
+* Git/GitHub
+* cloud deployment
 
 ---
 
 ## Disclaimer
 
-ParkWise is an educational project and is not an official National Park Service application.
+ParkWise Bangladesh is an educational project and is not affiliated with or endorsed by the Bangladesh Forest Department or BFIS.
 
-Park rules and conditions may change. Visitors should confirm current regulations and conditions using official park resources before making travel or safety decisions.
+Some source materials are historical management documents. Current park conditions, fees, regulations, operating hours, closures, and safety information should always be verified using current official sources.

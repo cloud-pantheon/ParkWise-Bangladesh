@@ -1,37 +1,30 @@
-from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from pdf_loader import load_pdf
-from chunker import chunk_pages
+from dataset_loader import load_dataset
 
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
-def load_all_chunks():
-    data_folder = Path(__file__).resolve().parent.parent / "data"
+# ---------------------------------------------------------
+# LOAD DATASET
+# ---------------------------------------------------------
 
-    pdf_files = list(data_folder.glob("*.pdf"))
-
-    all_chunks = []
-
-    for pdf_file in pdf_files:
-        pages = load_pdf(pdf_file)
-
-        chunks = chunk_pages(
-            pages,
-            chunk_size=250,
-            overlap=50
-        )
-
-        all_chunks.extend(chunks)
-
-    return all_chunks
+def load_all_records():
+    return load_dataset()
 
 
-def build_embeddings(chunks, model):
-    texts = [chunk["text"] for chunk in chunks]
+# ---------------------------------------------------------
+# BUILD EMBEDDINGS
+# ---------------------------------------------------------
+
+def build_embeddings(records, model):
+
+    texts = [
+        record["text"]
+        for record in records
+    ]
 
     embeddings = model.encode(
         texts,
@@ -41,173 +34,536 @@ def build_embeddings(chunks, model):
     return embeddings
 
 
-def search(query, chunks, embeddings, model, top_k=5):
-    import re
+# ---------------------------------------------------------
+# PARK DETECTION
+# ---------------------------------------------------------
+
+def detect_park(query):
 
     query_lower = query.lower()
 
-    # ---------------------------------
-    # 1. Detect park
-    # ---------------------------------
-    park_filter = None
+    if "lawachara" in query_lower:
+        return "Lawachara National Park"
 
-    if "redwood" in query_lower:
-        park_filter = "redwood.pdf"
+    if "satchari" in query_lower:
+        return "Satchari National Park"
 
-    elif "rainier" in query_lower:
-        park_filter = "mount_rainier.pdf"
+    if "bhawal" in query_lower:
+        return "Bhawal National Park"
 
-    elif "rocky mountain" in query_lower:
-        park_filter = "rocky_mountain.pdf"
+    return None
 
 
-    # ---------------------------------
-    # 2. Query expansion
-    # ---------------------------------
-    expanded_query = query
+# ---------------------------------------------------------
+# QUERY EXPANSION
+# ---------------------------------------------------------
 
-    if "pet" in query_lower or "pets" in query_lower or "dog" in query_lower:
-        expanded_query += (
-            " pets dogs allowed prohibited leash restrained trails"
-        )
+def expand_query(query):
+
+    query_lower = query.lower()
+
+    extra_terms = []
+
+    # Wildlife
+    if (
+        "wildlife" in query_lower
+        or "animal" in query_lower
+        or "animals" in query_lower
+        or "bird" in query_lower
+        or "birds" in query_lower
+    ):
+        extra_terms.extend([
+            "wildlife",
+            "animals",
+            "mammals",
+            "birds",
+            "reptiles",
+            "amphibians",
+            "biodiversity"
+        ])
+
+    # Forest
+    if (
+        "forest" in query_lower
+        or "tree" in query_lower
+        or "trees" in query_lower
+        or "vegetation" in query_lower
+    ):
+        extra_terms.extend([
+            "forest type",
+            "vegetation",
+            "sal forest",
+            "evergreen forest",
+            "semi-evergreen forest"
+        ])
+
+    # Facilities
+    if (
+        "facility" in query_lower
+        or "facilities" in query_lower
+        or "visitor" in query_lower
+        or "tourist" in query_lower
+        or "tourism" in query_lower
+    ):
+        extra_terms.extend([
+            "visitor facilities",
+            "tourism",
+            "ecotourism",
+            "trails",
+            "information center",
+            "picnic",
+            "toilets"
+        ])
+
+    # Location
+    if (
+        "where" in query_lower
+        or "location" in query_lower
+        or "located" in query_lower
+    ):
+        extra_terms.extend([
+            "location",
+            "district",
+            "upazila",
+            "Bangladesh"
+        ])
+
+    # Access
+    if (
+        "reach" in query_lower
+        or "get to" in query_lower
+        or "travel" in query_lower
+        or "go to" in query_lower
+        or "access" in query_lower
+    ):
+        extra_terms.extend([
+            "access",
+            "road",
+            "transport",
+            "travel",
+            "route"
+        ])
+
+    # Management
+    if (
+        "management" in query_lower
+        or "conservation" in query_lower
+        or "protect" in query_lower
+    ):
+        extra_terms.extend([
+            "management",
+            "conservation",
+            "co-management",
+            "stakeholders",
+            "biodiversity protection"
+        ])
+
+    # Community
+    if (
+        "community" in query_lower
+        or "communities" in query_lower
+        or "local people" in query_lower
+        or "indigenous" in query_lower
+    ):
+        extra_terms.extend([
+            "communities",
+            "local people",
+            "indigenous communities",
+            "stakeholders",
+            "livelihoods"
+        ])
+
+    # Threats
+    if (
+        "threat" in query_lower
+        or "threats" in query_lower
+        or "problem" in query_lower
+        or "problems" in query_lower
+        or "danger" in query_lower
+    ):
+        extra_terms.extend([
+            "threats",
+            "encroachment",
+            "industrialization",
+            "urbanization",
+            "conservation problems"
+        ])
+
+    if extra_terms:
+        return query + " " + " ".join(extra_terms)
+
+    return query
 
 
-    # ---------------------------------
-    # 3. Semantic embedding
-    # ---------------------------------
+# ---------------------------------------------------------
+# SEARCH
+# ---------------------------------------------------------
+
+def search(
+    query,
+    records,
+    embeddings,
+    model,
+    top_k=5
+):
+
+    query_lower = query.lower()
+
+    # Detect park mentioned in question
+    detected_park = detect_park(query)
+
+    # Expand the query
+    expanded_query = expand_query(query)
+
+    # Turn query into embedding
     query_embedding = model.encode(
         expanded_query,
         normalize_embeddings=True
     )
 
+    # Cosine similarity
     scores = np.dot(
         embeddings,
         query_embedding
     )
 
-
-    # ---------------------------------
-    # 4. Topic keywords
-    # ---------------------------------
-    pet_keywords = {
-        "pet",
-        "pets",
-        "dog",
-        "dogs",
-        "leash",
-        "restrained",
-        "prohibited"
-    }
-
-
-    candidate_results = []
-
+    results = []
 
     for index, score in enumerate(scores):
 
-        chunk = chunks[index]
+        record = records[index]
 
-        # Only search requested park
-        if park_filter and chunk["source"] != park_filter:
+        # -------------------------------------------------
+        # PARK METADATA FILTER
+        # -------------------------------------------------
+
+        if (
+            detected_park
+            and record["park"] != detected_park
+        ):
             continue
 
         adjusted_score = float(score)
 
-        # Convert chunk into real words
-        chunk_words = set(
-            re.findall(
-                r"\b[a-zA-Z]+\b",
-                chunk["text"].lower()
-            )
-        )
+        topic = record["topic"].lower()
+        text = record["text"].lower()
 
 
-        # ---------------------------------
-        # 5. Keyword boost
-        # ---------------------------------
+        # -------------------------------------------------
+        # TOPIC BOOSTS
+        # -------------------------------------------------
+
+        # Wildlife
         if (
-            "pet" in query_lower
-            or "pets" in query_lower
-            or "dog" in query_lower
+            "wildlife" in query_lower
+            or "animal" in query_lower
+            or "animals" in query_lower
+            or "bird" in query_lower
+            or "birds" in query_lower
         ):
 
-            hits = len(
-                pet_keywords.intersection(chunk_words)
-            )
+            if "wildlife" in topic:
+                adjusted_score += 0.30
 
-            adjusted_score += hits * 0.12
+            elif "birds" in topic:
+                adjusted_score += 0.25
+
+            elif "biodiversity" in topic:
+                adjusted_score += 0.20
 
 
-        candidate_results.append({
+        # Location
+        if (
+            "where" in query_lower
+            or "location" in query_lower
+            or "located" in query_lower
+        ):
+
+            if "identity_location" in topic:
+                adjusted_score += 0.30
+
+            elif "access" in topic:
+                adjusted_score += 0.10
+
+
+        # Access
+        if (
+            "reach" in query_lower
+            or "get to" in query_lower
+            or "travel" in query_lower
+            or "go to" in query_lower
+            or "access" in query_lower
+        ):
+
+            if "access" in topic:
+                adjusted_score += 0.30
+
+
+        # Facilities
+        if (
+            "facility" in query_lower
+            or "facilities" in query_lower
+        ):
+
+            if "facilities" in topic:
+                adjusted_score += 0.35
+
+            elif "visitor" in topic:
+                adjusted_score += 0.15
+
+            elif "ecotourism" in topic:
+                adjusted_score += 0.10
+
+            elif "trails_guides" in topic:
+                adjusted_score += 0.05
+
+
+        # Forest type
+        if (
+            "forest" in query_lower
+            or "vegetation" in query_lower
+            or "tree" in query_lower
+            or "trees" in query_lower
+        ):
+
+            if "forest_type" in topic:
+                adjusted_score += 0.30
+
+            elif "plants" in topic:
+                adjusted_score += 0.10
+
+
+        # Management
+        if (
+            "management" in query_lower
+            or "manage" in query_lower
+        ):
+
+            if "management" in topic:
+                adjusted_score += 0.30
+
+            elif "co_management" in topic:
+                adjusted_score += 0.25
+
+
+        # Conservation
+        if (
+            "conservation" in query_lower
+            or "protect" in query_lower
+            or "protection" in query_lower
+        ):
+
+            if "management_goals" in topic:
+                adjusted_score += 0.25
+
+            elif "co_management" in topic:
+                adjusted_score += 0.20
+
+            elif "land_use_threats" in topic:
+                adjusted_score += 0.15
+
+
+        # Communities
+        if (
+            "community" in query_lower
+            or "communities" in query_lower
+            or "local people" in query_lower
+            or "indigenous" in query_lower
+        ):
+
+            if "communities" in topic:
+                adjusted_score += 0.30
+
+            elif "livelihoods" in topic:
+                adjusted_score += 0.20
+
+
+        # Threats
+        if (
+            "threat" in query_lower
+            or "threats" in query_lower
+            or "problem" in query_lower
+            or "problems" in query_lower
+        ):
+
+            if "land_use_threats" in topic:
+                adjusted_score += 0.30
+
+
+        # Ecotourism
+        if (
+            "ecotourism" in query_lower
+            or "tourism" in query_lower
+        ):
+
+            if "ecotourism" in topic:
+                adjusted_score += 0.30
+
+            elif "visitor_use" in topic:
+                adjusted_score += 0.15
+
+
+        # Biodiversity monitoring
+        if (
+            "monitor" in query_lower
+            or "monitoring" in query_lower
+        ):
+
+            if "monitoring" in topic:
+                adjusted_score += 0.35
+
+
+        # -------------------------------------------------
+        # RESULT
+        # -------------------------------------------------
+
+        results.append({
             "score": adjusted_score,
-            "source": chunk["source"],
-            "page": chunk["page"],
-            "chunk_id": chunk["chunk_id"],
-            "text": chunk["text"]
+
+            "id":
+                record["id"],
+
+            "park":
+                record["park"],
+
+            "topic":
+                record["topic"],
+
+            "text":
+                record["text"],
+
+            "source_title":
+                record["source_title"],
+
+            "source_url":
+                record["source_url"],
+
+            "source_year":
+                record["source_year"],
+
+            "source_type":
+                record["source_type"],
+
+            "freshness_note":
+                record["freshness_note"]
         })
 
 
-    # Highest score first
-    candidate_results.sort(
+    # Sort highest score first
+    results.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
-    return candidate_results[:top_k]
+    return results[:top_k]
 
+
+# ---------------------------------------------------------
+# TERMINAL TEST
+# ---------------------------------------------------------
 
 if __name__ == "__main__":
-    print("Loading ParkWise documents...")
 
-    chunks = load_all_chunks()
+    print(
+        "Loading Bangladesh Parks dataset..."
+    )
 
-    print(f"Loaded {len(chunks)} chunks.")
+    records = load_all_records()
 
-    print("Loading embedding model...")
+    print(
+        f"Loaded {len(records)} records."
+    )
 
-    model = SentenceTransformer(MODEL_NAME)
+    print(
+        "Loading embedding model..."
+    )
 
-    print("Creating embeddings...")
+    model = SentenceTransformer(
+        MODEL_NAME
+    )
+
+    print(
+        "Creating embeddings..."
+    )
 
     embeddings = build_embeddings(
-        chunks,
+        records,
         model
     )
 
-    print("\nParkWise Semantic Search is ready!")
-    print("Type 'exit' to stop.\n")
+    print(
+        "\nBangladesh Parks Retriever Ready!"
+    )
+
+    print(
+        "Type 'exit' to stop."
+    )
+
 
     while True:
 
-        query = input("Ask a question: ")
+        query = input(
+            "\nAsk a question: "
+        )
 
         if query.lower() == "exit":
-            print("Goodbye!")
+
+            print(
+                "Goodbye!"
+            )
+
             break
+
 
         results = search(
             query,
-            chunks,
+            records,
             embeddings,
             model,
-            top_k=3
+            top_k=5
         )
 
-        print("\nTop Results:")
-        print("=" * 70)
 
-        for number, result in enumerate(results, start=1):
+        print(
+            "\nTop Results:"
+        )
 
-            print(f"\nResult {number}")
+        print(
+            "=" * 70
+        )
 
-            print(f"Similarity: {result['score']:.4f}")
-            print(f"Source: {result['source']}")
-            print(f"Page: {result['page']}")
-            print(f"Chunk: {result['chunk_id']}")
 
-            print("\nText:")
-            print(result["text"][:700])
+        for i, result in enumerate(
+            results,
+            start=1
+        ):
 
-            print("\n" + "-" * 70)
+            print(
+                f"\nResult {i}"
+            )
 
-        print()
+            print(
+                f"Score: {result['score']:.3f}"
+            )
+
+            print(
+                f"Park: {result['park']}"
+            )
+
+            print(
+                f"Topic: {result['topic']}"
+            )
+
+            print(
+                f"Source: {result['source_title']}"
+            )
+
+            print()
+
+            print(
+                result["text"]
+            )
+
+            print(
+                "\n" + "-" * 70
+            )
