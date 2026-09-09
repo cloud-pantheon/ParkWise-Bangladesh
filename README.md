@@ -10,7 +10,7 @@ The project was built from scratch as a learning-focused RAG implementation, wit
 
 ## 🚀 Live Demo
 
-> Add the Streamlit deployment URL here after deployment.
+> https://parkwise-bd.streamlit.app/
 
 ---
 
